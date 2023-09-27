@@ -1,0 +1,350 @@
+# Esame di Biometria
+
+## Alice Domini
+
+## 28/09/2023
+
+### Setto la directory e carico i pacchetti necessari
+
+### Importo i file
+
+File in formato FASTA con le sequenze allineate:
+
+```
+sequences=read.dna("sequences.fa",format="fasta")
+```
+
+File csv con i dati associati ad ogni sequenza:
+
+```
+metadata=read.csv("metadata.csv",header=T)
+```
+
+### Calcolo la matrice di distanze
+
+```
+seq.dist=dist.dna(sequences,pairwise.deletion=T)
+```
+
+### MDS classico (approccio metrico)
+
+```
+seq.mds=cmdscale(seq.dist)
+```
+
+Plotto l'MDS metrico (nominando grafico e assi):
+
+```
+plot(seq.mds,pch=20,main="MDS metrico",xlab="DIM.1",ylab="DIM.2")
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/aba1c98d-0b49-4a25-bc09-bf0954b85a17)
+
+Salvo il grafico:
+
+```
+dev.copy2pdf(file="MDS_metrico.pdf")
+```
+
+Osservo che c'è struttura: ci sono due raggruppamenti e un outlier (i gruppi li distinguo perché hanno x<0 o x>0).
+
+Riplotto l'MDS utilizzando le etichette corrispondenti agli individui e salvo anche il nuovo plot:
+
+```
+plot(seq.mds,type="n",main="MDS metrico",xlab="DIM.1",ylab="DIM.2")
+```
+```
+text(seq.mds,labels=rownames(sequences))
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/53bd445f-ff51-4a93-84a5-531b0b466973)
+
+```
+dev.copy2pdf(file="MDS_labels.pdf")
+```
+
+Osservo che l'outlier è l'individuo 28, che nelle note, dei dati contenuti nel file metadata, viene indicato come una possibilmente contaminato ("possibile-contamination").
+
+### Cluster Analysis
+
+Prima individuo il valore di "k" migliore, utilizzando il metodo del gomito, poi effettuo una cluster analysis gerarchica con più metodi.
+
+#### Metodo del gomito con k-means per scegliere il valore di "k"
+
+```
+tot.var=vector("numeric",10)
+```
+
+```
+for (i in 1:10) {
+  tot.var[i]=kmeans(seq.dist,centers=i,nstart=10)$tot.withinss
+  }
+```
+
+```
+plot(1:10,tot.var,type="b",xlab="number of centers",ylab="total variance",main="Scelta di k con il metodo del gomito")
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/950630fe-6d51-4680-b60c-d22acdec1f2f)
+
+```
+dev.copy2pdf(file="K-means.pdf")
+```
+
+Osservo che il migliore valore di k sembra essere 2.
+
+#### Cluster Analysis Gerarchica con più metodi
+
+##### Metodo di complete linkage:
+
+```
+seq.hc=hclust(seq.dist)
+```
+
+```
+plot(seq.hc,main="Cluster_Complete linkage")
+```
+
+Divido l'albero nei cluster principali (uso k=2):
+
+```
+rect.hclust(seq.hc,k=2,border=2:3)
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/4a7b41b7-e9e5-4c32-9177-69f22e86680b)
+
+```
+dev.copy2pdf(file="Complete.pdf")
+```
+
+Creo un vettore di appartenenza di ogni osservazione a un gruppo:
+
+```
+complete.group2=cutree(seq.hc,k=2)
+```
+
+##### Metodo della media:
+
+```
+seq.ha=hclust(seq.dist,method="average")
+```
+```
+plot(seq.ha,main="Cluster_Average")
+```
+
+Divido l'albero nei cluster principali (uso k=2):
+
+```
+rect.hclust(seq.ha,k=2,border=2:3)
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/00d6ea2d-eb03-4b84-acac-db42208b7a9f)
+
+```
+dev.copy2pdf(file="Average.pdf")
+```
+
+Creo un vettore di appartenenza di ogni osservazione a un gruppo:
+
+```
+av.group2=cutree(seq.ha,k=2)
+```
+
+##### Metodo della varianza:
+
+```
+seq.hw=hclust(seq.dist,method="ward.D")
+```
+```
+plot(seq.hw,main="Cluster_Varianza")
+```
+
+Divido l'albero nei cluster principali (uso k=2):
+
+```
+rect.hclust(seq.hw,k=2,border=2:3)
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/31c25e89-7a44-460e-81b0-d82ff0611a36)
+
+```
+dev.copy2pdf(file="Varianza.pdf")
+```
+
+Creo un vettore di appartenenza di ogni osservazione a un gruppo:
+
+```
+var.group2=cutree(seq.hw,k=2)
+```
+
+##### Controllo se c'è corrispondenza tra i due gruppi individuati con l'MDS e quelli della Cluster Analysis (lo ripeto per tutti i metodi di clustering)
+
+Per prima cosa creo un vettore in cui gli elementi di seq.mds con x<0 siano uguali ad "a" e quelli con x>0 siano uguali a "b":
+
+```
+mds.groups=factor()
+```
+```
+mds.groups=c(mds.groups,ifelse(seq.mds[,1]<0,"a","b"))
+```
+
+Confronto l'appartenenza di "a" e "b" ai due cluster: (k=2)
+
+Metodo di cluster linkage:
+
+```
+table(mds.groups,complete.group2)
+```
+
+|               |               |               |
+| ------------- | ------------- | ------------- |
+|               |       1       |       2       |
+|       a       |      10       |       0       |
+|       b       |       0       |      20       |
+
+Metodo della media:
+
+```
+table(mds.groups,av.group2)
+```
+
+|               |               |               |
+| ------------- | ------------- | ------------- |
+|               |       1       |       2       |
+|       a       |      10       |       0       |
+|       b       |       0       |      20       |
+
+Metodo della varianza:
+
+```
+table(mds.groups,var.group2)
+```
+
+|               |               |               |
+| ------------- | ------------- | ------------- |
+|               |       1       |       2       |
+|       a       |      10       |       0       |
+|       b       |       0       |      20       |
+
+Osservo che c'è corrispondenza tra i gruppi in tutti e 3 i casi.
+
+
+[VARIANTE:
+
+Per tutti e tre i metodi osservo lo stesso risultato:
+
+|               |               |               |
+| ------------- | ------------- | ------------- |
+|               |       1       |       2       |
+|       a       |      10       |       0       |
+|       b       |       0       |      20       |
+
+C'è, quindi, corrispondenza tra i gruppi in tutte e tre i casi.
+
+La tabella, infatti, mostra che i 10 individui del primo cluster appartengono solamente al gruppo "a" individuato dall'MDS metrico; allo stesso modo quelli del secondo appartengono solamente al gruppo "b".]
+
+### Distanza in giorni
+
+Creo una variabile numerica che per ognuno dei 30 casi rappresenti la distanza in giorni dall'inizio della pandemia.
+
+Utilizzo la funzione as.Date.
+
+Converto la colonna delle date in formato "date":
+
+```
+dates=as.Date(metadata$collec.dates)
+```
+
+Metto in un oggetto di tipo "date" la data di origine (la più vecchia a disposizione):
+
+```
+origin.dat=min(dates)
+```
+
+Converto in "numeric" tutto il vettore delle date:
+
+```
+date.numbers=as.numeric(dates - origin.date)
+```
+
+### Svolgo l'ANOVA tra i giorni di distanza e i raggruppamenti individuati
+
+Calcolo il modello:
+
+```
+mod=lm(date.numbers~mds.groups) 
+```
+
+Estraggo l'ANOVA:
+
+```
+anova(mod)
+```
+
+Analysis of Variance Table
+
+Response:
+
+|               |  date.numbers |               |               |               |               |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+|               |      Df       |    Sum Sq     |    Mean Sq    |    F value    |     Pr(>F)    |
+|   mds.groups  |       1       |     43.35     |     43.350    |     7.5228    |     0.0105*   |
+|   Residuals   |      28       |     161.35    |      5.763    |               |               |
+
+Signif. codes: 0 ' *** '  0.001 ' ** '  0.01 ' * '  0.05 ' . '  0.1 ' '  1
+
+Disegno il boxplot:
+
+```
+boxplot(date.numbers~mds.groups,main="Boxplot ANOVA",xlab="mds.groups",ylab="date.numbers",col=heat.colors(2),las=1)
+```
+
+![image](https://github.com/AliDomi98/Biometria/assets/146000613/d392fa41-3803-4af3-a867-c177eb423a7e)
+
+```
+dev.copy2pdf(file="Boxplot_ANOVA.pdf")
+```
+
+Osservato il risultato dell'ANOVA posso affermare che, dato il p-value non significativo, rifiuto H0 e quindi esiste "effetto gruppo".
+
+Inoltre, osservando il boxplot, posso notare che il gruppo "a" è più "antico" del "b", quindi i suoi individui hanno manifestato prima la malattia.
+
+### Testo l'associazione fra i gruppi e il grado di severità della malattia
+
+Per farlo utilizzo il test del chi-quadro.
+
+Costruisco una matrice che contenga i gruppi dell'MDS e i gradi di severità della malattia:
+
+```
+chi.data=as.matrix(table(mds.groups,metadata$outcome))
+```
+
+Eseguo il test del chi-quadro:
+
+```
+chisq.test(chi.data)
+```
+
+Output:
+
+Pearson's Chi-squared test with Yates' continuity correction
+
+data:  chi.data
+
+X-squared = 0.036058,  df = 1,  p-value = 0.8494
+
+
+
+Il p-value è molto maggiore della soglia di significatività del 5%, quindi non posso rifiutare H0 (afferma l'indipendenza delle due variabili).
+
+La gravità della malattia non dipende dal cluster assegnato, perciò non c'è un gruppo che causa malattie più o meno gravi.
+
+
+Per rispondere alla domanda iniziale, basandomi su questi risultati non posso affermare con certezza che si tratti di due ceppi virali.
+
+Benché i pazienti si possano distinguere in due cluster in base al momento di insorgenza della malattia, questi non corrispondono al raggruppamento inviduato sulla base della gravità della malattia stessa.
+
+
+[Potrei aggiungere:
+
+Si potrebbero effettuare altre analisi per indagare un'eventuale correlazione con il sesso, l'età o altri eventuali parametri.]
